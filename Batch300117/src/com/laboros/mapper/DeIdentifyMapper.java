@@ -70,6 +70,8 @@ public class DeIdentifyMapper extends
 			}
 		}
 		
+		System.out.println(finalOutput);
+		
 		context.write(new Text(finalOutput.toString()), NullWritable.get());
 		
 		
