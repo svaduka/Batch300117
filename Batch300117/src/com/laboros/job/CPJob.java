@@ -3,13 +3,19 @@ package com.laboros.job;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import com.laboros.partitioner.MyPartitioner;
 
-public class DeIdentifyJob extends Configured implements Tool {
+import com.laboros.mapper.WordCountMapper;
+import com.laboros.reducer.WordCountReducer;
+
+public class CPJob extends Configured implements Tool {
 
 	public static void main(String[] args) 
 	{
@@ -19,7 +25,7 @@ public class DeIdentifyJob extends Configured implements Tool {
 		//Step-1 Validation
 		if(args.length<2)
 		{
-			System.out.println("JAVA Usage "+DeIdentifyJob.class.getName()+" [configuration] /path/to/hdfs/file /path/hdfs/dest/location");
+			System.out.println("JAVA Usage "+CPJob.class.getName()+" [configuration] /path/to/hdfs/file /path/hdfs/dest/location");
 			return;
 		}
 		
@@ -28,7 +34,7 @@ public class DeIdentifyJob extends Configured implements Tool {
 		try {
 			//step-3 : INvoking ToolRunner.run --> It is a generic option parser 
 			//parse command line arguments and set to the configuration
-			int i=ToolRunner.run(conf, new DeIdentifyJob(), args);
+			int i=ToolRunner.run(conf, new CPJob(), args);
 			if(i==0)
 			{
 				System.out.println("SUCCESS");
@@ -47,10 +53,10 @@ public class DeIdentifyJob extends Configured implements Tool {
 		//u have to set any parameter to configuration object here
 		
 		//Step:2 Job instance is a useful to access the cluster
-		Job deIdentifyJob=Job.getInstance(conf, DeIdentifyJob.class.getName());
+		Job cpJob=Job.getInstance(conf, CPJob.class.getName());
 	
 		//Step: 3 setting classpath for the Mapper program
-		deIdentifyJob.setJarByClass(DeIdentifyJob.class);
+		cpJob.setJarByClass(CPJob.class);
 		
 		//setting input and output
 		
@@ -58,34 +64,35 @@ public class DeIdentifyJob extends Configured implements Tool {
 		final String input=args[0];
 		//Convert into URI, because hdfs url always represent in URI
 		final Path inputPath= new Path(input);
-		TextInputFormat.addInputPath(deIdentifyJob, inputPath);
-		deIdentifyJob.setInputFormatClass(TextInputFormat.class);
+		TextInputFormat.addInputPath(cpJob, inputPath);
+		cpJob.setInputFormatClass(TextInputFormat.class);
 		
 		//Step:5 setting output
 		
 		final String output=args[1];
 		//Convert into URL, because hdfs url ways represent in URI
 		final Path outputPath=new Path(output);
-		TextOutputFormat.setOutputPath(deIdentifyJob, outputPath);
-		deIdentifyJob.setOutputFormatClass(TextOutputFormat.class);
+		TextOutputFormat.setOutputPath(cpJob, outputPath);
+		cpJob.setOutputFormatClass(TextOutputFormat.class);
 		
 		//setting mapper and Reducer
 		
 		//Step-6: Set mapper
-//		deIdentifyJob.setMapperClass(DeIdentifyMapper.class);
+		cpJob.setMapperClass(WordCountMapper.class);
 		//Step-7: SetMapper output key and value classes
-//		deIdentifyJob.setMapOutputKeyClass(Text.class);
-//		deIdentifyJob.setMapOutputValueClass(NullWritable.class);
-		
-		deIdentifyJob.setNumReduceTasks(0);
+		cpJob.setMapOutputKeyClass(Text.class);
+		cpJob.setMapOutputValueClass(IntWritable.class);
+		cpJob.setCombinerClass(WordCountReducer.class);
+		cpJob.setNumReduceTasks(3);
+		cpJob.setPartitionerClass(MyPartitioner.class);
 		
 		//step-8 : Set reducer
-//		deIdentifyJob.setReducerClass(DeIdentifyReducer.class);
+		cpJob.setReducerClass(WordCountReducer.class);
 		//Step-9: set reducer output key and value classes
-//		deIdentifyJob.setOutputKeyClass(Text.class);
-//		deIdentifyJob.setOutputValueClass(IntWritable.class);
+		cpJob.setOutputKeyClass(Text.class);
+		cpJob.setOutputValueClass(IntWritable.class);
 		//step-10
-		deIdentifyJob.waitForCompletion(Boolean.TRUE);
+		cpJob.waitForCompletion(Boolean.TRUE);
 		return 0;
 	}
 }
