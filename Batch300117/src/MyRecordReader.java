@@ -1,3 +1,5 @@
+
+
 import java.io.IOException;
 
 import org.apache.hadoop.io.Text;
@@ -55,8 +57,18 @@ public class MyRecordReader extends RecordReader<MyKey,MyValue> {
 			if(value == null){
 				value = new MyValue();
 			}
+			
+//			a	1386023259550	on	22	23
+
 			Text line = reader.getCurrentValue();
 			String[] tokens = line.toString().split("\t");
+			
+			//tokens[0]=a
+			//tokens[1]=1386023259550
+			//tokens[2]=on
+			//tokens[3]=22
+			//tokens[4]=23
+			
 			key.setSensorType(new Text(tokens[0]));
 			key.setTimestamp(new Text(tokens[1]));
 			key.setStatus(new Text(tokens[2]));
