@@ -27,6 +27,12 @@ public class MyDC {
         
 		
 		private Map<String, String> abMap = new HashMap<String, String>();
+		
+		//abMap
+//		up	Uttar_Pradesh
+//		ma	Maharashtra
+//		bi	Bihar
+//		wb	WestBengal
 				private Text outputKey = new Text();
 				private Text outputValue = new Text();
 		
@@ -37,11 +43,13 @@ public class MyDC {
 			for (Path p : files) {
 				if (p.getName().equals("abc.dat")) {
 					BufferedReader reader = new BufferedReader(new FileReader(p.toString()));
-					String line = reader.readLine();
+					String line = reader.readLine(); //up	Uttar_Pradesh
 					while(line != null) {
 						String[] tokens = line.split("\t");
-						String ab = tokens[0];
-						String state = tokens[1];
+						//tokens[0] = up
+						//tokens[1] =Uttar_Pradesh
+						String ab = tokens[0]; //up
+						String state = tokens[1]; //Uttar_Pradesh
 						abMap.put(ab, state);
 						line = reader.readLine();
 					}
@@ -57,13 +65,13 @@ public class MyDC {
             throws java.io.IOException, InterruptedException {
         	
         	
-        	String row = value.toString();
-        	String[] tokens = row.split("\t");
-        	String inab = tokens[0];
-        	String state = abMap.get(inab);
+        	String row = value.toString(); //up	199654321
+        	String[] tokens = row.split("\t"); 
+        	String inab = tokens[0]; //up
+        	String state = abMap.get(inab); // Uttar_pradesh
         	outputKey.set(state);
         	outputValue.set(row);
-      	  	context.write(outputKey,outputValue);
+      	  	context.write(outputKey,outputValue);//Uttar_pradesh up 1232423
         }  
 }
 	
