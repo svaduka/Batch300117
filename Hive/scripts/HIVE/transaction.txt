@@ -1,0 +1,5 @@
+1,prod-1,1,300,A Jumper
+2,prod-1,2,300,A Jumper
+3,prod-1,2,300,A Jumper
+4,prod-2,3,100,A Rubber
+5,prod-1,3,300,A Jumper

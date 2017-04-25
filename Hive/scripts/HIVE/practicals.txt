@@ -1,0 +1,533 @@
+IN RDBMS
+
+create table student(Id int primary key, name varchar(50));
+
+insert into student values(1,'sai');
+insert into student values(NULL,'AAA');
+
+
+A. Create Database
+------------------
+create database retail;
+
+B. Select Database
+------------------
+use retail;
+
+C. Create table for storing transactional records
+-------------------------------------------------
+create table txnrecords(txnno INT, txndate STRING, custno INT, amount DOUBLE, 
+category STRING, product STRING, city STRING, state STRING, spendby STRING)
+row format delimited
+fields terminated by ','
+stored as textfile;
+
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/txns.txt' OVERWRITE INTO TABLE txnrecords;
+
+select * from txnrecords where category='Puzzles'; --> whether there will be a Map for this query? 
+
+dfs -mkdir -p /user/edureka/HIVE/TXNS/;
+
+create external table etxnrecords(txnno INT, txndate STRING, custno INT, amount DOUBLE, category STRING, product STRING, city STRING, state STRING, spendby STRING)
+row format delimited
+fields terminated by ','
+stored as textfile location '/user/edureka/HIVE/TXNS/';
+
+
+Load Data local inpath '/home/edureka/SAIWS/Dataset/HIVE/txns.txt' OVERWRITE INTO TABLE etxnrecords;
+
+
+[aditya is the folder which has all the data related to the table'
+
+
+create table results(txnno INT, txndate STRING, custno INT, amount DOUBLE, 
+category STRING, product STRING, city STRING, state STRING, spendby STRING)
+row format delimited
+fields terminated by ','
+stored as textfile;
+
+D. Load the data into the table [ From Linux client and not HDFS]
+-------------------------------
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/txns.txt' OVERWRITE INTO TABLE txnrecords;
+E. Describing metadata or schema of the table
+---------------------------------------------
+describe txnrecords;
+
+F. Counting no of records
+-------------------------
+select count(*) from txnrecords;
+
+G. Counting total spending by category of products
+--------------------------------------------------
+select category, sum(amount) from txnrecords group by category;
+
+H. 10 customers
+--------------------
+select custno, sum(amount) from txnrecords group by custno limit 10;
+
+Table A --> 1000 rows and has a column called region and the values of the region [ usa,uk,india].
+
+select col1,col2 from A where region='india';
+
+I. Create partitioned table
+---------------------------
+create table txnrecsByCat(txnno INT, txndate STRING, custno INT, amount DOUBLE,
+product STRING, city STRING, state STRING, spendby STRING)
+partitioned by (category STRING)
+clustered by (state) INTO 10 buckets
+row format delimited
+fields terminated by ','
+stored as orc;
+
+Bucketing formula--> 
+(hash of the bucketed column(state)) % no of buckets(10) = 
+
+Venkat --> ca1ad34c030ecf7d3690f5cc531d2aad
+Mukesh --> 71bf7cc5964bc4a79f7150d77603ad25
+
+Table Customer -->Col State [ 10 unique values ]
+Maharashtra, WestBengal, UttarPradesh, MadhyaPradesh, Kerala
+Col product [ 15 unique values ] 
+
+partition the data based on product col --> 15 partitions
+
+bucketed the data based on State col  in to 7 buckets --> 7 buckets
+
+a) Will all buckets have some value? 
+   Ans: May be as it is totally dependent on the value of the hash
+b) Will one bucket have more than 1 value? 
+   Ans: Yes
+c) Is there a guarantee that all similar values [ Maharashtra ]  will always go in one bucket.
+   Ans: Yes
+
+
+
+
+
+J. Configure Hive to allow partitions
+-------------------------------------
+
+However, a query across all partitions could trigger an enormous MapReduce job if the table data and number of partitions are large. A highly suggested safety measure is putting Hive into strict mode, which prohibits queries of partitioned tables without a WHERE clause that filters on partitions. You can set the mode to nonstrict, as in the following session:
+
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.dynamic.partition=true;
+set hive.enforce.bucketing=true;
+
+K. Load data into partition table
+----------------------------------
+from txnrecords txn INSERT OVERWRITE TABLE txnrecsByCat PARTITION(category)
+select txn.txnno, txn.txndate,txn.custno, txn.amount,txn.product,txn.city,txn.state,
+txn.spendby, txn.category DISTRIBUTE BY category;
+
+Bucketing
+
+SELECT txnno,product,state 
+FROM txnrecsbycat TABLESAMPLE(BUCKET 2 OUT OF 10);
+
+select txnno, product FROM txnrecsbycat TABLESAMPLE(BUCKET 2 OUT OF 10) order by txnno;
+
+
+==========================
+find sales based on age group
+==========================
+
+create external table customer(custno string, firstname string, lastname string, age int,profession string)
+row format delimited
+fields terminated by ',';
+
+load data local inpath '/home/edureka/SAIWS/Dataset/HIVE/custs' into table customer;
+
+create table out1 (custno int,firstname string,age int,profession string,amount double,product string)
+row format delimited                                                                                  
+fields terminated by ',';   
+
+insert overwrite table out1                                                                           
+select a.custno,a.firstname,a.age,a.profession,b.amount,b.product                                     
+from customer a JOIN txnrecords b ON a.custno = b.custno;     
+
+select * from out1 limit 100;
+
+create table out2 (custno int,firstname string,age int,profession string,amount double,product string, level string)
+row format delimited                                                                                  
+fields terminated by ',';   
+
+insert overwrite table out2
+select * , case
+ when age<30 then 'low'
+ when age>=30 and age < 50 then 'middle'
+ when age>=50 then 'old' 
+ else 'others'
+end
+from out1;
+
+
+ select * from out2 limit 100; 
+
+ describe out2;  
+
+create table out3 (level string, amount double)                                                                                   
+row format delimited
+fields terminated by ',';
+
+insert overwrite table out3  
+ select level,sum(amount) from out2 group by level;
+
+
+==============
+simple join
+==============
+
+****emp.txt
+****swetha,250000,Chennai
+****anamika,200000,Kanyakumari
+****tarun,300000,Pondi
+****anita,250000,Selam
+
+
+****email.txt
+****swetha,swetha@gmail.com
+****tarun,tarun@edureka.in
+****nagesh,nagesh@yahoo.com
+****venkatesh,venki@gmail.com
+
+
+create table employee(name string, salary float,city string)
+row format delimited
+fields terminated by ',';
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/emp.txt' INTO TABLE employee;
+
+select * from employee where name='tarun';
+
+create table mailid (name string, email string)
+row format delimited
+fields terminated by ',';
+
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/email.txt' INTO TABLE mailid;
+
+select a.name,a.city,a.salary,b.email from 
+employee a join mailid b on a.name = b.name;
+
+select a.name,a.city,a.salary,b.email from 
+employee a left outer join mailid b on a.name = b.name;
+
+select a.name,a.city,a.salary,b.email from 
+employee a right outer join mailid b on a.name = b.name;
+
+select a.name,a.city,a.salary,b.email from 
+employee a full outer join mailid b on a.name = b.name;
+
+
+
+===============================================
+DYNAMIC PARTITIONING
+===============================================
+
+create external table txnrecords(txnno INT, txndate STRING, custno INT, amount DOUBLE, 
+category STRING, product STRING, city STRING, state STRING, spendby STRING)
+row format delimited
+fields terminated by ','
+stored as textfile location '/user/edureka/HIVE/TXNS/';
+
+
+---CREATING MANAGED TABLE ---DESTINATION TABLE
+
+create table txnrecsByCat(txnno INT, txndate STRING, custno INT, amount DOUBLE,
+product STRING, city STRING, state STRING, spendby STRING)
+partitioned by (category STRING)
+clustered by (state) INTO 10 buckets
+row format delimited
+fields terminated by ','
+stored as textfile;
+
+
+
+set hive.exec.dynamic.partition.mode=nonstrict;
+set hive.exec.dynamic.partition=true;
+set hive.enforce.bucketing=true;
+
+K. Load data into partition table
+----------------------------------
+from txnrecords txn INSERT OVERWRITE TABLE txnrecsByCat PARTITION(category)
+select txn.txnno, txn.txndate,txn.custno, txn.amount,txn.product,txn.city,txn.state,
+txn.spendby, txn.category DISTRIBUTE BY category;
+
+Bucketing
+
+SELECT txnno,product,state 
+FROM txnrecsbycat TABLESAMPLE(BUCKET 3 OUT OF 10);
+
+select txnno, product FROM txnrecsbycat TABLESAMPLE(BUCKET 2 OUT OF 10) order by txnno;
+
+
+===============================================
+Custom Mapper Code to manipulate unix timestamp
+===============================================
+
+CREATE EXTERNAL TABLE u_data ( userid INT, movieid INT, rating INT, unixtime STRING) 
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' STORED AS TEXTFILE
+LOCATION '/user/edureka/HIVE/MOVIES'; 
+
+****1	101	8	1369721454
+****2	102	8	1369821454
+****3	103	8	1369921454
+****4	105	8	1370021454  
+****5	106	9	1370021454
+
+****And load it into the table that was just created:
+
+LOAD DATA LOCAL INPATH 'u.data' OVERWRITE INTO TABLE u_data; 
+
+Count the number of rows in table u_data:
+SELECT COUNT(*) FROM u_data; 
+
+****Create weekday_mapper.py:
+
+import sys 
+import datetime 
+for line in sys.stdin: 
+line = line.strip() 
+userid, movieid, rating, unixtime = line.split('\t') 
+weekday = datetime.datetime.fromtimestamp(float(unixtime)).isoweekday() 
+print '\t'.join([userid, movieid, rating, str(weekday)]) 
+
+CREATE TABLE u_data_new ( 
+userid INT, 
+movieid INT, 
+rating INT, 
+weekday INT) 
+ROW FORMAT DELIMITED 
+FIELDS TERMINATED BY '\t'
+STORED AS ORC; 
+
+add FILE /home/edureka/SAIWS/Dataset/HIVE/weekday_mapper.py; 
+
+****Note that columns will be transformed to string and delimited 
+****by TAB before feeding to the user script, and the standard output 
+****of the user script will be treated as TAB-separated string columns.
+
+****The following command uses the TRANSFORM clause to embed the mapper scripts.
+
+INSERT OVERWRITE TABLE u_data_new 
+SELECT 
+TRANSFORM (userid, movieid, rating, unixtime) 
+USING 'python weekday_mapper.py' 
+AS (userid, movieid, rating, weekday) 
+FROM u_data; 
+
+SELECT weekday, COUNT(*) 
+FROM u_data_new 
+GROUP BY weekday;
+
+
+===========
+UDF
+===========
+
+import java.util.Date;
+import java.text.DateFormat;
+import org.apache.hadoop.hive.ql.exec.UDF; 
+import org.apache.hadoop.io.Text;
+public class UnixtimeToDate extends UDF{
+public Text evaluate(Text text){
+if(text==null) return null;
+long timestamp = Long.parseLong(text.toString());
+return new Text(toDate(timestamp));
+}
+private String toDate(long timestamp) {
+Date date = new Date (timestamp*1000);
+return DateFormat.getInstance().format(date).toString();
+}
+}
+
+javac -classpath /usr/lib/hadoop-0.20/hadoop-core-0.20.2-cdh3u0.jar:/usr/lib/hive/lib/hive-exec-0.7.0-cdh3u0.jar UnixtimeToDate.java
+
+****Pack this class file into a jar: 
+$jar -cvf convert.jar UnixtimeToDate.class
+
+****Verify jar using command : 
+$jar -tvf convert.jar
+
+****add this jar in hive prompt
+ADD JAR  convert.jar;
+
+****Then you create your custom function as follows:
+create temporary function userdate as 'UnixtimeToDate';
+
+****one,1386023259550
+****two,1389523259550
+****three,1389523259550
+****four,1389523259550
+
+create table testing(id string,unixtime string)
+row format delimited
+fields terminated by ',';
+
+load data inpath '/data/counter' into table testing;
+
+hive> select * from testing;
+****OK
+****one1386023259550
+****two1389523259550
+****three1389523259550
+****four1389523259550
+
+****Then use function 'userdate' in sql command
+
+select id,userdate(unixtime) from testing;
+
+****OK
+****four3/28/02 8:12 PM
+****one4/30/91 1:59 PM
+****two3/28/02 8:12 PM
+****three3/28/02 8:12 PM
+
+Lower UDF
+
+create table lower(id int,name string)
+row format delimited
+fields terminated by ',';
+
+load data local inpath '/home/edureka/SAIWS/Dataset/HIVE/Lower.txt' INTO TABLE lower;
+
+ADD JAR /home/edureka/SAIWS/batch261116/JobJars/LowerUDF.jar;
+CREATE  FUNCTION to_lower as 'com.edureka.hive.udfs.Lower';
+
+select id,to_lower(name) from lower;
+
+
+
+_----------------------------------------
+
+HIVE INDEX
+_----------------------------------------
+
+
+CREATE INDEX txn_index
+ON table txnrecords(state)
+AS 'org.apache.hadoop.hive.ql.index.compact.CompactIndexHandler'
+WITH DEFERRED REBUILD
+in table txn_record_table;
+
+ALTER INDEX txn_index on txnrecords REBUILD;
+
+select * from txnrecords where state='Oregon';
+
+
+create table users(id int,email string , language string, location string)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',';
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/Users.txt' OVERWRITE INTO table users;
+
+create table transactions(id int, productid string, userid int, purchaseamount float, itemdescription string)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',';
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/transaction.txt' OVERWRITE INTO table transactions;
+
+select productid, count(distinct location),count(1) from users u join transactions t on u.id=t.userid group by productid;
+
+create view txnview
+as select * from txnrecords limit 10;
+
+
+
+
+--Complex data types
+
+create table complextable(id int, name string, salary float, address array<string>, location string)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+COLLECTION ITEMS TERMINATED BY '$' 
+STORED AS TEXTFILE;
+
+
+load data local inpath '/home/edureka/SAIWS/Dataset/HIVE/ArrayInput.txt' INTO TABLE complextable;
+
+
+create table user(id int,email string, lan string, loc string)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',';
+
+load data local inpath '/home/edureka/SAIWS/Dataset/HIVE/Users.txt' INTO TABLE user;
+
+create table txn(id int, pid string, userid int, amount float, desc string)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',';
+
+load data local inpath '/home/edureka/SAIWS/Dataset/HIVE/transaction.txt' INTO TABLE txn;
+
+select pid, count(distinct loc) from user u join txn t
+on u.id=t.userid
+group by pid;
+
+
+
+---------PARTITIONING -----------------
+
+create external table student(id int,name string, year int)
+ROW FORMAT DELIMITED 
+FIELDS TERMINATED BY ',';
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/student' INTO TABLE STUDENT;
+
+select * from student where year=2016;
+
+
+create table studentpart(id int,name string)
+PARTITIONED BY (year int)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ',';
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/student_2015' INTO TABLE STUDENTPART PARTITION (year=2015);
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/student_2016' INTO TABLE STUDENTPART PARTITION (year=2016);
+
+select * from studentpart where year=2015;
+
+show partitions studentpart;
+------MULTI INSERT ---
+
+create table results(txnno INT, txndate STRING, custno INT, amount DOUBLE, 
+category STRING, product STRING, city STRING, state STRING, spendby STRING)
+row format delimited
+fields terminated by ','
+stored as textfile;
+
+
+from txnrecords txn
+insert overwrite table results
+select txn.*
+insert overwrite local directory '/tmp/results'
+select txn.*
+insert overwrite directory '/user/edureka/HIVE/results'
+select txn.*;
+
+
+
+--STORAGE HANDLERS ---
+create external table customer(custno string, firstname string, lastname string, age int,profession string)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,info:fname,info:lname,info:age,info:prof")
+TBLPROPERTIES ("hbase.table.name" = "customers", "hbase.mapred.output.outputtable" = "xyz");
+
+
+create table student(id int,name string, year int)
+ROW FORMAT DELIMITED 
+FIELDS TERMINATED BY ',';
+
+LOAD DATA LOCAL INPATH '/home/edureka/SAIWS/Dataset/HIVE/studentHbase' OVERWRITE INTO TABLE STUDENT;
+
+
+
+--STORAGE HANDLERS ---
+create external table hbaseStudent(id int, name string, year string)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,info:name,info:year")
+TBLPROPERTIES ("hbase.table.name" = "student", "hbase.mapred.output.outputtable" = "xyz");
+
+insert overwrite table hbasestudent
+select id,name,year from student;
